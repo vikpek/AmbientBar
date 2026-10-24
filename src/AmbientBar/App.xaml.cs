@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using System.Threading;
 using System.Windows;
 
@@ -10,12 +12,25 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        _singleInstance = new Mutex(true, "AmbientBar.SingleInstance", out bool isNew);
-        if (!isNew)
+        // After a self-update the old instance is still shutting down, so wait for it to let go.
+        bool afterUpdate = e.Args.Contains("--after-update");
+        _singleInstance = new Mutex(false, "AmbientBar.SingleInstance");
+        bool owned;
+        try
+        {
+            owned = _singleInstance.WaitOne(afterUpdate ? TimeSpan.FromSeconds(20) : TimeSpan.Zero);
+        }
+        catch (AbandonedMutexException)
+        {
+            owned = true; // the previous instance exited without releasing it, which is fine
+        }
+        if (!owned)
         {
             Shutdown();
             return;
         }
+
+        Updates.CleanUpAfterUpdate();
         base.OnStartup(e);
     }
 }

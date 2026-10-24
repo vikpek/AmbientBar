@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     readonly MediaPlayer _player = new() { AudioCategory = MediaPlayerAudioCategory.Media };
     readonly ObservableCollection<Track> _queue = new();
     readonly ObservableCollection<Track> _results = new();
+    readonly ObservableCollection<Track> _favorites = new();
     readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromSeconds(1) };
     readonly DispatcherTimer _statusTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     readonly AppState _state = AppState.Load();
@@ -37,7 +38,16 @@ public partial class MainWindow : Window
         ResultsList.ItemsSource = _results;
         QueueList.ItemsSource = _queue;
 
+        FavoritesList.ItemsSource = _favorites;
+
         foreach (var t in _state.Queue) _queue.Add(t);
+        foreach (var f in _state.Favorites)
+        {
+            // Share one instance per video so stars and the "now playing" highlight stay in sync.
+            var t = Canonical(f);
+            t.IsFavorite = true;
+            _favorites.Add(t);
+        }
         _current = _queue.FirstOrDefault(t => t.Id == _state.CurrentId);
         if (_current != null)
         {
@@ -46,11 +56,14 @@ public partial class MainWindow : Window
             NowPlaying.Text = _current.Title;
             UpdateTime();
         }
-        _queue.CollectionChanged += (_, _) => { UpdateQueueEmpty(); SaveState(); };
-        UpdateQueueEmpty();
+        _queue.CollectionChanged += (_, _) => { UpdateEmptyHints(); SaveState(); };
+        _favorites.CollectionChanged += (_, _) => { UpdateEmptyHints(); SaveState(); };
+        UpdateEmptyHints();
         UpdateRepeat();
 
         _player.Volume = _state.Volume;
+        VolumeSlider.Value = _state.Volume * 100;
+        UpdateVolumeUi();
         // Media keys / the Windows media flyout drive play & pause directly; we only add "next".
         _player.CommandManager.NextBehavior.EnablingRule = MediaCommandEnablingRule.Always;
         _player.CommandManager.NextReceived += (_, e) => { e.Handled = true; Dispatcher.Invoke(() => Next(manual: true)); };
@@ -68,7 +81,13 @@ public partial class MainWindow : Window
         _statusTimer.Tick += (_, _) => { _statusTimer.Stop(); NowPlaying.Text = _current?.Title ?? "Nothing playing"; };
 
         SetupTray();
-        Loaded += (_, _) => Dock();
+        Loaded += (_, _) =>
+        {
+            Dock();
+            var args = Environment.GetCommandLineArgs();
+            if (args.Contains("--after-update")) ShowStatus($"Updated to v{Updates.Current.ToString(3)}", seconds: 5);
+            if (args.Contains("--resume") && _current != null) TogglePlay();
+        };
         SizeChanged += (_, _) => Dock();
         Deactivated += (_, _) => SetExpanded(false);
         Closing += (_, _) => { SaveState(); _tray.Visible = false; _tray.Dispose(); _player.Dispose(); };
@@ -199,8 +218,15 @@ public partial class MainWindow : Window
             : Track.FormatTime(_lastPosition);
     }
 
-    void UpdateQueueEmpty() =>
+    void UpdateEmptyHints()
+    {
         QueueEmpty.Visibility = _queue.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        FavoritesEmpty.Visibility = _favorites.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>The instance already in the queue or favorites for this video, or the track itself.</summary>
+    Track Canonical(Track t) =>
+        _queue.FirstOrDefault(q => q.Id == t.Id) ?? _favorites.FirstOrDefault(f => f.Id == t.Id) ?? t;
 
     void UpdateRepeat()
     {
@@ -208,11 +234,13 @@ public partial class MainWindow : Window
         RepeatButton.ToolTip = _state.Repeat ? "Repeat queue: on" : "Repeat queue: off";
     }
 
-    void ShowStatus(string text, bool sticky = false)
+    void ShowStatus(string text, bool sticky = false, double seconds = 2)
     {
         NowPlaying.Text = text;
         _statusTimer.Stop();
-        if (!sticky) _statusTimer.Start();
+        if (sticky) return;
+        _statusTimer.Interval = TimeSpan.FromSeconds(seconds);
+        _statusTimer.Start();
     }
 
     void SetExpanded(bool expanded)
@@ -237,6 +265,7 @@ public partial class MainWindow : Window
     void SaveState()
     {
         _state.Queue = _queue.ToList();
+        _state.Favorites = _favorites.ToList();
         _state.CurrentId = _current?.Id;
         _state.Position = _lastPosition;
         _state.Volume = _player.Volume;
@@ -259,21 +288,71 @@ public partial class MainWindow : Window
         menu.Items.Add("Play / pause", null, (_, _) => TogglePlay());
         menu.Items.Add("Next", null, (_, _) => Next(manual: true));
         menu.Items.Add(new Forms.ToolStripSeparator());
+        menu.Items.Add("Check for updates", null, async (_, _) => await CheckForUpdateAsync(manual: true));
         menu.Items.Add("Quit", null, (_, _) => Close());
         _tray.ContextMenuStrip = menu;
-        _ = CheckForUpdateAsync(menu);
+        _trayMenu = menu;
+        _ = CheckForUpdateAsync(manual: false);
     }
 
-    async Task CheckForUpdateAsync(Forms.ContextMenuStrip menu)
+    // ---------- updates ----------
+
+    Forms.ContextMenuStrip? _trayMenu;
+    Forms.ToolStripMenuItem? _updateItem;
+    Updates.Release? _pendingUpdate;
+
+    async Task CheckForUpdateAsync(bool manual)
     {
+        if (manual) ShowStatus("Checking for updates…");
         var latest = await Updates.GetNewerReleaseAsync();
-        if (latest == null) return;
-        var item = new Forms.ToolStripMenuItem($"Update available: {latest.Tag}", null, (_, _) => Updates.OpenDownloadPage());
-        item.Font = new System.Drawing.Font(item.Font, System.Drawing.FontStyle.Bold);
-        menu.Items.Insert(0, item);
-        menu.Items.Insert(1, new Forms.ToolStripSeparator());
-        _tray.Text = $"AmbientBar — {latest.Tag} available";
-        ShowStatus($"AmbientBar {latest.Tag} is available — see the tray menu");
+        if (latest == null)
+        {
+            if (manual) ShowStatus($"You're up to date (v{Updates.Current.ToString(3)})", seconds: 4);
+            return;
+        }
+
+        _pendingUpdate = latest;
+        if (_updateItem == null && _trayMenu != null)
+        {
+            _updateItem = new Forms.ToolStripMenuItem();
+            _updateItem.Font = new System.Drawing.Font(_updateItem.Font, System.Drawing.FontStyle.Bold);
+            _updateItem.Click += async (_, _) => await InstallUpdateAsync();
+            _trayMenu.Items.Insert(0, _updateItem);
+            _trayMenu.Items.Insert(1, new Forms.ToolStripSeparator());
+        }
+        if (_updateItem != null) _updateItem.Text = $"Update to {latest.Tag}";
+        _tray.Text = $"AmbientBar {Updates.Current.ToString(3)} ({latest.Tag} available)";
+        ShowStatus($"{latest.Tag} is available. Update from the tray menu", seconds: 8);
+    }
+
+    async Task InstallUpdateAsync()
+    {
+        if (_pendingUpdate is not { } release) return;
+        if (!Updates.CanSelfUpdate)
+        {
+            // Dev build, or the exe lives somewhere we can't write (e.g. Program Files).
+            Updates.OpenDownloadPage();
+            return;
+        }
+
+        if (_updateItem != null) _updateItem.Enabled = false;
+        try
+        {
+            var progress = new Progress<int>(p => ShowStatus($"Downloading {release.Tag}… {p}%", sticky: true));
+            await Updates.InstallAsync(release, progress);
+        }
+        catch (Exception ex)
+        {
+            if (_updateItem != null) _updateItem.Enabled = true;
+            ShowStatus("Update failed: " + ex.Message, sticky: true);
+            return;
+        }
+
+        bool wasPlaying = _player.PlaybackSession.PlaybackState == MediaPlaybackState.Playing;
+        ShowStatus($"Restarting into {release.Tag}…", sticky: true);
+        SaveState();
+        Updates.Restart(resumePlayback: wasPlaying);
+        Close();
     }
 
     // ---------- search ----------
@@ -292,7 +371,7 @@ public partial class MainWindow : Window
         {
             var found = await YtDlp.SearchAsync(query, cts.Token);
             if (cts.IsCancellationRequested) return;
-            foreach (var t in found) _results.Add(t);
+            foreach (var t in found) _results.Add(Canonical(t));
             ResultsStatus.Visibility = found.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             ResultsStatus.Text = "No results.";
             ResultsList.Visibility = found.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -330,12 +409,8 @@ public partial class MainWindow : Window
     void ResultsList_Click(object sender, MouseButtonEventArgs e)
     {
         if ((e.OriginalSource as FrameworkElement)?.DataContext is not Track t) return;
-        var existing = _queue.FirstOrDefault(q => q.Id == t.Id);
-        if (existing == null)
-        {
-            _queue.Add(t);
-            existing = t;
-        }
+        var existing = Canonical(t);
+        if (!_queue.Contains(existing)) _queue.Add(existing);
         bool idle = _player.Source == null || _player.PlaybackSession.PlaybackState != MediaPlaybackState.Playing;
         if (idle) _ = PlayAsync(existing);
         else ShowStatus("Queued: " + t.Title);
@@ -344,6 +419,31 @@ public partial class MainWindow : Window
     void QueueList_Click(object sender, MouseButtonEventArgs e)
     {
         if ((e.OriginalSource as FrameworkElement)?.DataContext is Track t) _ = PlayAsync(t);
+    }
+
+    void FavoritesList_Click(object sender, MouseButtonEventArgs e)
+    {
+        if ((e.OriginalSource as FrameworkElement)?.DataContext is not Track t) return;
+        var track = Canonical(t);
+        if (!_queue.Contains(track)) _queue.Add(track);
+        _ = PlayAsync(track);
+    }
+
+    void ToggleFavorite_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is not Track t) return;
+        t = Canonical(t);
+        if (t.IsFavorite)
+        {
+            t.IsFavorite = false;
+            var pinned = _favorites.FirstOrDefault(f => f.Id == t.Id);
+            if (pinned != null) _favorites.Remove(pinned);
+        }
+        else
+        {
+            t.IsFavorite = true;
+            _favorites.Add(t);
+        }
     }
 
     void RemoveFromQueue_Click(object sender, RoutedEventArgs e)
@@ -367,8 +467,34 @@ public partial class MainWindow : Window
 
     void Bar_MouseWheel(object sender, MouseWheelEventArgs e)
     {
-        _player.Volume = Math.Clamp(_player.Volume + (e.Delta > 0 ? 0.05 : -0.05), 0, 1);
-        ShowStatus($"Volume {Math.Round(_player.Volume * 100)}%");
+        // Routes through the slider so the panel, the player and the label stay in sync.
+        VolumeSlider.Value = Math.Clamp(VolumeSlider.Value + (e.Delta > 0 ? 5 : -5), 0, 100);
+        if (Panel.Visibility != Visibility.Visible) ShowStatus($"Volume {Math.Round(_player.Volume * 100)}%");
         SaveState();
+        e.Handled = true;
+    }
+
+    void VolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        _player.Volume = e.NewValue / 100;
+        _player.IsMuted = false;
+        UpdateVolumeUi();
+    }
+
+    void VolumeSlider_PreviewMouseUp(object sender, MouseButtonEventArgs e) => SaveState();
+
+    void VolumeIcon_Click(object sender, RoutedEventArgs e)
+    {
+        _player.IsMuted = !_player.IsMuted;
+        UpdateVolumeUi();
+    }
+
+    void UpdateVolumeUi()
+    {
+        double v = _player.Volume;
+        bool muted = _player.IsMuted || v < 0.005;
+        VolumeIcon.Content = muted ? "" : v < 0.34 ? "" : v < 0.67 ? "" : "";
+        VolumeIcon.ToolTip = _player.IsMuted ? "Unmute" : "Mute";
+        VolumeText.Text = _player.IsMuted ? "Muted" : $"{Math.Round(v * 100)}%";
     }
 }

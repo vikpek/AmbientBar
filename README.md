@@ -37,8 +37,10 @@ A tiny Windows player for long YouTube ambient tracks. It sits as a slim bar in 
 - **Media keys and the Windows media flyout.** Play/Pause/Next keys, headset buttons and the volume-flyout controls all work. The flyout shows the track's thumbnail.
 - **Plain-text search.** Results show only titles and lengths. You can also paste a YouTube video or playlist link.
 - **Short queue with repeat.** Built for one to three long tracks.
+- **Favorites.** Star a track to pin it at the bottom of the panel, and click it to play it again.
+- **Volume slider** in the panel, with one-click mute. Scrolling over the bar works too.
 - **Resumes where you left off.** The queue, track, position and volume are saved. If a stream link expires partway through a 10-hour track, it gets a fresh one and continues from the same spot.
-- **Update notice.** When a new release is out, it shows up in the tray menu.
+- **Updates itself.** When a new release is out, pick **Update** in the tray menu. It downloads and verifies the new version, then restarts and keeps playing.
 
 ## Install
 
@@ -50,6 +52,8 @@ A tiny Windows player for long YouTube ambient tracks. It sits as a slim bar in 
    This also installs Deno, which yt-dlp needs for YouTube. If yt-dlp isn't installed, AmbientBar downloads its own copy to `%LOCALAPPDATA%\AmbientBar` the first time you search.
 3. Run it. If Windows SmartScreen warns about an unrecognized app (the exe isn't code-signed), click **More info → Run anyway**.
 
+> **Updating:** AmbientBar updates itself from the tray menu. This works as long as the exe is in a folder you can write to, like Desktop, Downloads or your user folder. If it's in `Program Files`, the update option opens the download page instead.
+
 > **Start with Windows:** press <kbd>Win</kbd>+<kbd>R</kbd>, type `shell:startup`, and put a shortcut to `AmbientBar.exe` in that folder.
 
 ## Controls
@@ -60,8 +64,11 @@ A tiny Windows player for long YouTube ambient tracks. It sits as a slim bar in 
 | Queue a result | Click it. If nothing is playing, it starts right away |
 | Play from the queue | Click the track |
 | Remove from the queue | The <kbd>×</kbd> next to it |
+| Favorite a track | Hover a search result or queue item and click its ☆ |
+| Play a favorite | Click it in **FAVORITES**. Click its ★ to unpin it |
 | Play / pause / next | Bar buttons, keyboard media keys, or the Windows media flyout |
-| Volume | Scroll the mouse wheel over the bar |
+| Volume | Slider at the bottom of the panel, or scroll the mouse wheel over the bar. Click the speaker icon to mute |
+| Update | **Update to vX** in the tray menu when one is available, or **Check for updates** |
 | Repeat queue | Loop icon next to **QUEUE** (on by default) |
 | Collapse | <kbd>Esc</kbd>, or click anywhere else |
 | Hide / show | Left-click the tray icon |

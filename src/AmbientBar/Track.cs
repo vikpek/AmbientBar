@@ -25,6 +25,14 @@ public sealed class Track : INotifyPropertyChanged
         set { _isCurrent = value; PropertyChanged?.Invoke(this, new(nameof(IsCurrent))); }
     }
 
+    bool _isFavorite;
+    [JsonIgnore]
+    public bool IsFavorite
+    {
+        get => _isFavorite;
+        set { _isFavorite = value; PropertyChanged?.Invoke(this, new(nameof(IsFavorite))); }
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public static string FormatTime(double seconds)
@@ -37,6 +45,7 @@ public sealed class Track : INotifyPropertyChanged
 public sealed class AppState
 {
     public List<Track> Queue { get; set; } = new();
+    public List<Track> Favorites { get; set; } = new();
     public string? CurrentId { get; set; }
     public double Position { get; set; }
     public double Volume { get; set; } = 0.6;
