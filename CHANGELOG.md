@@ -2,6 +2,11 @@
 
 All notable changes to AmbientBar are listed here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] - 2026-10-24
+
+- The tray menu shows a notice when a newer version is available
+- Hovering the tray icon shows the version number
+
 ## [0.1.0] - 2026-10-24
 
 First release.
@@ -14,4 +19,5 @@ First release.
 - Gets a fresh stream link when one expires during a long track
 - Tray icon (show/hide, play/pause, next, quit) and a notice when a new version is available
 
+[0.1.1]: https://github.com/vikpek/AmbientBar/releases/tag/v0.1.1
 [0.1.0]: https://github.com/vikpek/AmbientBar/releases/tag/v0.1.0
