@@ -1,0 +1,186 @@
+<Window x:Class="AmbientBar.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="AmbientBar" Width="380" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" Topmost="True" ShowInTaskbar="False"
+        FontFamily="Segoe UI" FontSize="12" Foreground="#E6E6E6"
+        UseLayoutRounding="True">
+  <Window.Resources>
+    <FontFamily x:Key="Icons">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+    <SolidColorBrush x:Key="Hover" Color="#1FFFFFFF"/>
+    <SolidColorBrush x:Key="Accent" Color="#8AB4F8"/>
+    <SolidColorBrush x:Key="Dim" Color="#8A8F98"/>
+
+    <Style x:Key="IconButton" TargetType="Button">
+      <Setter Property="FontFamily" Value="{StaticResource Icons}"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="Foreground" Value="#E6E6E6"/>
+      <Setter Property="Width" Value="30"/>
+      <Setter Property="Height" Value="30"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="b" Background="Transparent" CornerRadius="6">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="b" Property="Background" Value="{StaticResource Hover}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style TargetType="ScrollBar">
+      <Setter Property="Width" Value="6"/>
+      <Setter Property="MinWidth" Value="6"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ScrollBar">
+            <Track x:Name="PART_Track" IsDirectionReversed="True">
+              <Track.Thumb>
+                <Thumb>
+                  <Thumb.Template>
+                    <ControlTemplate TargetType="Thumb">
+                      <Border Background="#44FFFFFF" CornerRadius="3"/>
+                    </ControlTemplate>
+                  </Thumb.Template>
+                </Thumb>
+              </Track.Thumb>
+            </Track>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="PlainList" TargetType="ListBox">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Foreground" Value="#E6E6E6"/>
+      <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+      <Setter Property="ItemContainerStyle">
+        <Setter.Value>
+          <Style TargetType="ListBoxItem">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+              <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                  <Border x:Name="b" Background="Transparent" CornerRadius="5" Padding="8,4">
+                    <ContentPresenter/>
+                  </Border>
+                  <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                      <Setter TargetName="b" Property="Background" Value="{StaticResource Hover}"/>
+                    </Trigger>
+                  </ControlTemplate.Triggers>
+                </ControlTemplate>
+              </Setter.Value>
+            </Setter>
+          </Style>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Window.Resources>
+
+  <Border Background="#F21C1D21" CornerRadius="10" BorderBrush="#33FFFFFF" BorderThickness="1" Padding="6">
+    <StackPanel>
+
+      <!-- Expanded panel: search, results, queue -->
+      <StackPanel x:Name="Panel" Visibility="Collapsed" Margin="2,2,2,6">
+        <Grid>
+          <TextBox x:Name="SearchBox" Background="#2A2C31" Foreground="#E6E6E6" CaretBrush="#E6E6E6"
+                   BorderThickness="0" Padding="8,6" FontSize="12"
+                   KeyDown="SearchBox_KeyDown" TextChanged="SearchBox_TextChanged">
+            <TextBox.Resources>
+              <Style TargetType="Border">
+                <Setter Property="CornerRadius" Value="6"/>
+              </Style>
+            </TextBox.Resources>
+          </TextBox>
+          <TextBlock x:Name="SearchHint" Text="Search YouTube or paste a link, then Enter"
+                     Foreground="{StaticResource Dim}" Margin="11,0,0,0" VerticalAlignment="Center"
+                     IsHitTestVisible="False"/>
+        </Grid>
+
+        <TextBlock x:Name="ResultsStatus" Foreground="{StaticResource Dim}" Margin="8,6,0,2"
+                   Visibility="Collapsed" TextWrapping="Wrap"/>
+        <ListBox x:Name="ResultsList" Style="{StaticResource PlainList}" MaxHeight="210" Margin="0,4,0,0"
+                 MouseLeftButtonUp="ResultsList_Click" Visibility="Collapsed"
+                 ToolTip="Click to add to queue">
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"/>
+                <TextBlock Grid.Column="1" Text="{Binding DurationText}" Foreground="{StaticResource Dim}" Margin="8,0,0,0"/>
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+
+        <Grid Margin="8,10,0,2">
+          <TextBlock Text="QUEUE" Foreground="{StaticResource Dim}" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"/>
+          <Button x:Name="RepeatButton" Style="{StaticResource IconButton}" Content="&#xE8EE;" FontSize="11"
+                  Width="24" Height="22" HorizontalAlignment="Right" Click="Repeat_Click"/>
+        </Grid>
+        <TextBlock x:Name="QueueEmpty" Text="Nothing queued yet." Foreground="{StaticResource Dim}" Margin="8,2,0,0"/>
+        <ListBox x:Name="QueueList" Style="{StaticResource PlainList}" MaxHeight="130"
+                 MouseLeftButtonUp="QueueList_Click" ToolTip="Click to play">
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="t" Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                <Button Grid.Column="1" Style="{StaticResource IconButton}" Content="&#xE711;" FontSize="9"
+                        Width="20" Height="20" Margin="6,0,0,0" Foreground="{StaticResource Dim}"
+                        Tag="{Binding}" Click="RemoveFromQueue_Click" ToolTip="Remove"/>
+              </Grid>
+              <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                  <Setter TargetName="t" Property="Foreground" Value="{StaticResource Accent}"/>
+                  <Setter TargetName="t" Property="FontWeight" Value="SemiBold"/>
+                </DataTrigger>
+              </DataTemplate.Triggers>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </StackPanel>
+
+      <!-- Always-visible bar -->
+      <Grid x:Name="Bar" Background="Transparent" MouseWheel="Bar_MouseWheel"
+            ToolTip="Scroll to change volume">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition/>
+          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <Button x:Name="PlayButton" Style="{StaticResource IconButton}" Content="&#xE768;" Click="Play_Click"/>
+        <Button Grid.Column="1" Style="{StaticResource IconButton}" Content="&#xE893;" Click="Next_Click" ToolTip="Next"/>
+        <TextBlock x:Name="NowPlaying" Grid.Column="2" Text="Nothing playing" Margin="6,0"
+                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                   MouseLeftButtonUp="NowPlaying_Click" Cursor="Hand"/>
+        <TextBlock x:Name="TimeText" Grid.Column="3" Foreground="{StaticResource Dim}" Margin="0,0,4,0"
+                   VerticalAlignment="Center" FontSize="11"/>
+        <Button x:Name="ExpandButton" Grid.Column="4" Style="{StaticResource IconButton}" Content="&#xE70E;"
+                Click="Expand_Click" ToolTip="Search &amp; queue"/>
+        <Button Grid.Column="5" Style="{StaticResource IconButton}" Content="&#xE711;" FontSize="10"
+                Click="Close_Click" ToolTip="Quit"/>
+      </Grid>
+    </StackPanel>
+  </Border>
+</Window>
