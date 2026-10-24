@@ -1,0 +1,44 @@
+name: Release
+
+# Push a tag like v0.2.0 and this builds AmbientBar.exe and attaches it to a GitHub release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish single-file exe
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          dotnet publish src/AmbientBar/AmbientBar.csproj -c Release -r win-x64 --self-contained `
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:Version=$version -o out
+          $hash = (Get-FileHash out/AmbientBar.exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  AmbientBar.exe" | Set-Content out/AmbientBar.exe.sha256 -NoNewline
+
+      - name: Create release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $header = @"
+          **[⬇ Download AmbientBar.exe](https://github.com/${{ github.repository }}/releases/download/$tag/AmbientBar.exe)**: a single self-contained file for Windows 10/11 x64, with no installer.
+
+          For search and playback, also run ``winget install yt-dlp.yt-dlp`` (recommended).
+
+          "@
+          gh release create $tag out/AmbientBar.exe out/AmbientBar.exe.sha256 `
+            --title "AmbientBar $tag" --notes "$header" --generate-notes
