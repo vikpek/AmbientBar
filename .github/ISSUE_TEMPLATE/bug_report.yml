@@ -1,0 +1,33 @@
+name: Bug report
+description: Something isn't working
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: YouTube link (if it's about a specific track)
+  - type: input
+    id: version
+    attributes:
+      label: AmbientBar version
+      description: Hover the tray icon to see it.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: ytdlp
+    attributes:
+      label: yt-dlp version
+      description: Output of `yt-dlp --version`, or "bundled" if you didn't install it.
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: Windows 11 24H2

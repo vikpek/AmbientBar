@@ -1,0 +1,11 @@
+# Groups auto-generated release notes by PR label.
+changelog:
+  categories:
+    - title: ✨ New
+      labels: [enhancement]
+    - title: 🐛 Fixes
+      labels: [bug]
+    - title: 🧰 Maintenance
+      labels: [dependencies, chore, documentation]
+    - title: Other changes
+      labels: ['*']
